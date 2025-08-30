@@ -1,0 +1,12 @@
+version: 2
+
+updates:
+  # Frontend
+
+  # Backend
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore(deps)"

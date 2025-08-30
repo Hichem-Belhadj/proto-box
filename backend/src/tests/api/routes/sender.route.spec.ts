@@ -1,9 +1,10 @@
 import express from "express";
 import request from "supertest";
-import { ProxyService } from "../../services/proxy.service";
-import router from "../../api/send.route";
+import {ProxyService} from "../../../services/proxy.service";
+import router from "../../../api/routes/send.route";
+import {container} from "../../../config/container";
 
-jest.mock("../../utils/errors/logger", () => ({
+jest.mock("../../../utils/errors/logger", () => ({
     __esModule: true,
     default: {
         info: jest.fn(),
@@ -21,7 +22,7 @@ const parseAsBuffer = (res: any, cb: any) => {
 
 const buildAppRaw = () => {
     const app = express();
-    app.use(express.raw({ type: "*/*" }));
+    app.use(express.raw({type: "*/*"}));
     app.use("/send", router);
     return app;
 };
@@ -40,6 +41,15 @@ const buildAppJson = () => {
 };
 
 describe("POST /send", () => {
+
+    let proxyServiceMock: Partial<ProxyService>;
+
+    beforeEach(() => {
+        proxyServiceMock = {forwardBinary: jest.fn()};
+
+        container.rebindSync<ProxyService>("ProxyService").toConstantValue(proxyServiceMock as ProxyService);
+    });
+
     afterEach(() => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
@@ -57,7 +67,7 @@ describe("POST /send", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "Missing url query param" });
+        expect(res.body).toEqual({error: "Missing url query param"});
     });
 
     it("should return 400 when payload is missing", async () => {
@@ -67,11 +77,11 @@ describe("POST /send", () => {
         // WHEN
         const res = await request(app)
             .post("/send")
-            .query({ url: "http://backend/pb" });
+            .query({url: "http://backend/pb"});
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "Missing protobuf payload" });
+        expect(res.body).toEqual({error: "Missing protobuf payload"});
     });
 
     it("should return 400 when payload is not a Buffer", async () => {
@@ -82,33 +92,31 @@ describe("POST /send", () => {
         // WHEN
         const res = await request(app)
             .post("/send")
-            .query({ url: "http://backend/pb" })
-            .send({ a: 1 });
+            .query({url: "http://backend/pb"})
+            .send({a: 1});
 
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "Missing protobuf payload" });
+        expect(res.body).toEqual({error: "Missing protobuf payload"});
     });
 
     it("should proxy binary payload and return octet-stream with upstream status", async () => {
         // GIVEN
         const app = buildAppRaw();
 
-        const svcSpy = jest
-            .spyOn(ProxyService, "forwardBinary")
-            .mockResolvedValue({
-                status: 206,
-                data: Buffer.from([9, 8, 7]),
-                headers: { "x-up": "y" },
-            });
+        proxyServiceMock.forwardBinary = jest.fn().mockResolvedValue({
+            status: 206,
+            data: Buffer.from([9, 8, 7]),
+            headers: {"x-up": "y"},
+        });
 
         // WHEN
         const res = await request(app)
             .post("/send")
             .query({
                 url: "http://backend/pb",
-                headers: JSON.stringify({ "X-Trace": "abc" }), // transmis tel quel à forwardBinary
+                headers: JSON.stringify({"X-Trace": "abc"}),
             })
             .set("Content-Type", "application/x-protobuf")
             .parse(parseAsBuffer)
@@ -120,8 +128,8 @@ describe("POST /send", () => {
         expect(Buffer.isBuffer(res.body)).toBe(true);
         expect(Buffer.compare(res.body, Buffer.from([9, 8, 7]))).toBe(0);
 
-        expect(svcSpy).toHaveBeenCalledTimes(1);
-        const [calledUrl, calledPayload, calledHeaders] = svcSpy.mock.calls[0];
+        expect(proxyServiceMock.forwardBinary).toHaveBeenCalledTimes(1);
+        const [calledUrl, calledPayload, calledHeaders] = (proxyServiceMock.forwardBinary as jest.Mock).mock.calls[0];
         expect(calledUrl).toBe("http://backend/pb");
         expect(Buffer.isBuffer(calledPayload)).toBe(true);
         expect(Buffer.compare(calledPayload, Buffer.from([0xaa, 0xbb]))).toBe(0);
@@ -132,19 +140,17 @@ describe("POST /send", () => {
         // GIVEN
         const app = buildAppRaw();
 
-        jest
-            .spyOn(ProxyService, "forwardBinary")
-            .mockRejectedValue(new Error("upstream unavailable"));
+        proxyServiceMock.forwardBinary = jest.fn().mockRejectedValue(new Error("upstream unavailable"));
 
         // WHEN
         const res = await request(app)
             .post("/send")
-            .query({ url: "http://backend/pb" })
+            .query({url: "http://backend/pb"})
             .set("Content-Type", "application/x-protobuf")
             .send(Buffer.from([0x01, 0x02]));
 
         // THEN
         expect(res.status).toBe(500);
-        expect(res.body).toEqual({ error: "upstream unavailable" });
+        expect(res.body).toEqual({error: "upstream unavailable"});
     });
 });

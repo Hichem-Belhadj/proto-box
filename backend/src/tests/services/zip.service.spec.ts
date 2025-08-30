@@ -1,7 +1,7 @@
 import AdmZip from "adm-zip";
 import path from "path";
 import os from "os";
-import { promises as fs } from "fs";
+import {promises as fs} from "fs";
 import {ZipService} from "../../services/zip.service";
 
 async function writeTempZip(zip: AdmZip): Promise<string> {
@@ -14,7 +14,6 @@ function makeZip(entries: Array<{ name: string; data?: Buffer | string }>): AdmZ
     const zip = new AdmZip();
     for (const e of entries) {
         if (e.name.endsWith("/")) {
-            // entrée dossier
             (zip as any).addFile(e.name, Buffer.alloc(0), "", 0o755 << 16); // force dir attr
         } else {
             const buf = Buffer.isBuffer(e.data) ? e.data : Buffer.from(e.data ?? "");
@@ -25,6 +24,10 @@ function makeZip(entries: Array<{ name: string; data?: Buffer | string }>): AdmZ
 }
 
 describe("ZipService.extractSafely", () => {
+    let service: ZipService;
+
+    beforeEach(() => service = new ZipService());
+
     afterEach(() => jest.restoreAllMocks());
 
     it("should extract files and return only normalized .proto entries", async () => {
@@ -38,7 +41,7 @@ describe("ZipService.extractSafely", () => {
         const zipPath = await writeTempZip(zip);
 
         // WHEN
-        const res = await ZipService.extractSafely(zipPath, { maxEntries: 10, maxUncompressed: 1024 * 1024 });
+        const res = await service.extractSafely(zipPath, { maxEntries: 10, maxUncompressed: 1024 * 1024 });
 
         // THEN
         const stat = await fs.stat(res.extractedTo);
@@ -62,7 +65,7 @@ describe("ZipService.extractSafely", () => {
         const zipPath = await writeTempZip(zip);
 
         // WHEN THEN
-        await expect(ZipService.extractSafely(zipPath, { maxEntries: 1 }))
+        await expect(service.extractSafely(zipPath, { maxEntries: 1 }))
             .rejects.toThrow("Too many zip entries");
     });
 
@@ -76,7 +79,7 @@ describe("ZipService.extractSafely", () => {
         const zipPath = await writeTempZip(zip);
 
         // WHEN THEN
-        await expect(ZipService.extractSafely(zipPath, { maxUncompressed: 1024 * 1024 })) // 1 MiB
+        await expect(service.extractSafely(zipPath, { maxUncompressed: 1024 * 1024 })) // 1 MiB
             .rejects.toThrow("Uncompressed size limit exceeded");
     });
 
@@ -89,11 +92,11 @@ describe("ZipService.extractSafely", () => {
         };
 
         jest
-            .spyOn(ZipService as any, "readEntries")
+            .spyOn(service as any, "readEntries")
             .mockReturnValue([malicious as AdmZip.IZipEntry]);
 
         // WHEN THEN
-        await expect(ZipService.extractSafely("ignored.zip"))
+        await expect(service.extractSafely("ignored.zip"))
             .rejects.toThrow("Zip Slip detected");
     });
 
@@ -106,7 +109,7 @@ describe("ZipService.extractSafely", () => {
         const zipPath = await writeTempZip(zip);
 
         // WHEN
-        const res = await ZipService.extractSafely(zipPath);
+        const res = await service.extractSafely(zipPath);
 
         // THEN
         await expect(fs.stat(path.join(res.extractedTo, "deep", "nested", "file.proto"))).resolves.toBeDefined();
@@ -119,7 +122,7 @@ describe("ZipService.extractSafely", () => {
         const zipPath = await writeTempZip(zip);
 
         // WHEN
-        const res = await ZipService.extractSafely(zipPath);
+        const res = await service.extractSafely(zipPath);
 
         // THEN
         expect(res.protoFiles).toEqual([]);

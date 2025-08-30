@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import { promises as fs } from "fs";
 
-import { uploadZip } from "../../middleware/uploadZip";
+import { uploadZip } from "../../../api/middleware/uploadZip";
 
 const buildApp = () => {
     const app = express();
