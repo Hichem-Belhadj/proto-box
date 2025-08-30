@@ -1,24 +1,22 @@
 import path from "path";
-import os from "os";
-import { promises as fs } from "fs";
-import { ProtocService } from "../../services/protoc.service";
-
-type RunSig = (cmd: string, args: string[], opts: { cwd: string }) => Promise<void>;
+import tmp from "tmp";
+import {promises as fs} from "fs";
+import {ProtocService} from "../../services/protoc.service";
 
 async function mkdtemp(prefix = "protoc-svc-"): Promise<string> {
-    const dir = path.join(os.tmpdir(), `${prefix}${Date.now()}-${Math.random().toString(16).slice(2)}`);
-    await fs.mkdir(dir, { recursive: true });
-    return dir;
+    return tmp.dirSync({ prefix, unsafeCleanup: true }).name;
 }
 
 describe("ProtocService.buildDescriptor", () => {
-    afterEach(async () => {
-        jest.restoreAllMocks();
-    });
+    let service: ProtocService;
+
+    beforeEach(() => service = new ProtocService());
+
+    afterEach(async () =>  jest.restoreAllMocks());
 
     it("should throw when no .proto files are found", async () => {
         const root = await mkdtemp();
-        await expect(ProtocService.buildDescriptor(root))
+        await expect(service.buildDescriptor(root))
             .rejects.toThrow("Aucun fichier .proto trouvé");
         await fs.rm(root, { recursive: true, force: true });
     });
@@ -28,7 +26,7 @@ describe("ProtocService.buildDescriptor", () => {
         const root = await mkdtemp();
         await fs.mkdir(path.join(root, "a", "b"), { recursive: true });
         await fs.writeFile(path.join(root, "a", "b", "x.proto"), 'syntax = "proto3";');
-        await fs.writeFile(path.join(root, "ROOT.PROTO"), 'syntax = "proto3";'); // casse différente
+        await fs.writeFile(path.join(root, "ROOT.PROTO"), 'syntax = "proto3";');
         await fs.writeFile(path.join(root, "notes.txt"), "ignore");
 
         let capturedCmd = "";
@@ -36,27 +34,28 @@ describe("ProtocService.buildDescriptor", () => {
         let capturedCwd = "";
 
         const fakeDescriptor = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
-        const svc = ProtocService as unknown as { run: RunSig };
 
-        const runSpy = jest.spyOn(svc, "run") as jest.SpyInstance<
+        const runSpy = jest.spyOn(service as any, "run") as jest.SpyInstance<
             Promise<void>,
             [string, string[], { cwd: string }]
         >;
 
-        runSpy.mockImplementation(async (cmd, args, opts) => {
-            capturedCmd = cmd;
-            capturedArgs = args;
-            capturedCwd = opts.cwd;
+        runSpy.mockImplementation(
+            async (cmd: string, args: string[], opts: { cwd: string }) => {
+                capturedCmd = cmd;
+                capturedArgs = args;
+                capturedCwd = opts.cwd;
 
-            const outFlag = args.find(a => a.startsWith("--descriptor_set_out="));
-            const outPath = outFlag?.split("=", 2)[1];
-            if (!outPath) throw new Error("missing --descriptor_set_out");
+                const outFlag = args.find(a => a.startsWith("--descriptor_set_out="));
+                const outPath = outFlag?.split("=", 2)[1];
+                if (!outPath) throw new Error("missing --descriptor_set_out");
 
-            await fs.writeFile(outPath, fakeDescriptor);
-        });
+                await fs.writeFile(outPath, fakeDescriptor);
+            }
+        );
 
         // WHEN
-        const res = await ProtocService.buildDescriptor(root); // default outName: descriptor.pb
+        const res = await service.buildDescriptor(root);
 
         // THEN
         expect(capturedCmd).toBe("protoc");
@@ -69,7 +68,10 @@ describe("ProtocService.buildDescriptor", () => {
             `--descriptor_set_out=${path.join(root, "descriptor.pb")}`,
         ]));
 
-        const protoArgs = capturedArgs.filter(a => !a.startsWith("--") && a.toLowerCase().endsWith(".proto"));
+        // Vérifie que les .proto trouvés sont bien passés à protoc
+        const protoArgs = capturedArgs.filter(
+            a => !a.startsWith("--") && a.toLowerCase().endsWith(".proto")
+        );
         const normalized = protoArgs.map(p => p.replace(/\\/g, "/").toLowerCase());
 
         expect(normalized).toHaveLength(2);
@@ -87,12 +89,11 @@ describe("ProtocService.buildDescriptor", () => {
         const root = await mkdtemp();
         await fs.writeFile(path.join(root, "a.proto"), 'syntax = "proto3";');
 
-        jest
-            .spyOn(ProtocService as any, "run")
+        jest.spyOn(service as any, "run")
             .mockRejectedValue(new Error("protoc exit 1: missing import"));
 
         // WHEN THEN
-        await expect(ProtocService.buildDescriptor(root))
+        await expect(service.buildDescriptor(root))
             .rejects.toThrow(/protoc exit 1: missing import/);
 
         await fs.rm(root, { recursive: true, force: true });
@@ -103,21 +104,21 @@ describe("ProtocService.buildDescriptor", () => {
         const root = await mkdtemp();
         await fs.writeFile(path.join(root, "x.proto"), 'syntax = "proto3";');
 
-        const svc = ProtocService as unknown as { run: RunSig };
-
-        const runSpy = jest.spyOn(svc, "run") as jest.SpyInstance<
+        const runSpy = jest.spyOn(service as any, "run") as jest.SpyInstance<
             Promise<void>,
             [string, string[], { cwd: string }]
         >;
 
-        runSpy.mockImplementation(async (_cmd, args, _opts) => {
-            const outFlag = args.find(a => a.startsWith("--descriptor_set_out="))!;
-            const outPath = outFlag.split("=", 2)[1];
-            await fs.writeFile(outPath, Buffer.from([1, 2, 3]));
-        });
+        runSpy.mockImplementation(
+            async (_cmd: string, args: string[], _opts: { cwd: string }) => {
+                const outFlag = args.find(a => a.startsWith("--descriptor_set_out="))!;
+                const outPath = outFlag.split("=", 2)[1];
+                await fs.writeFile(outPath, Buffer.from([1, 2, 3]));
+            }
+        );
 
         // WHEN
-        const out = await ProtocService.buildDescriptor(root, "out.desc");
+        const out = await service.buildDescriptor(root, "out.desc");
 
         // THEN
         expect(out.equals(Buffer.from([1, 2, 3]))).toBe(true);

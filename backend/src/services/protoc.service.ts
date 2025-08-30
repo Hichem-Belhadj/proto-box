@@ -1,9 +1,12 @@
 import {spawn} from "child_process";
 import {promises as fs} from "fs";
 import path from "path";
+import {injectable} from "inversify";
 
+@injectable()
 export class ProtocService {
-    static async buildDescriptor(rootDir: string, outName = "descriptor.pb"): Promise<Buffer> {
+
+    public buildDescriptor = async (rootDir: string, outName = "descriptor.pb"): Promise<Buffer> => {
         const protoFiles = await this.listProtoFiles(rootDir);
         if (protoFiles.length === 0) throw new Error("Aucun fichier .proto trouvé");
 
@@ -20,7 +23,7 @@ export class ProtocService {
         return fs.readFile(outPath);
     }
 
-    private static async listProtoFiles(dir: string): Promise<string[]> {
+    private listProtoFiles = async (dir: string): Promise<string[]> => {
         const out: string[] = [];
         async function walk(d: string) {
             const entries = await fs.readdir(d, { withFileTypes: true });
@@ -34,7 +37,7 @@ export class ProtocService {
         return out.sort();
     }
 
-    private static run(cmd: string, args: string[], opts: { cwd: string }): Promise<void> {
+    private run = (cmd: string, args: string[], opts: { cwd: string }): Promise<void> => {
         return new Promise((resolve, reject) => {
             const child = spawn(cmd, args, {
                 cwd: opts.cwd,

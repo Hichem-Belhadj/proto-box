@@ -3,8 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import path from "path";
-import parseRoute from "./api/parse.route";
-import sendRoute from "./api/send.route";
+import routes from "./api/routes";
 
 class App {
     public app: Application;
@@ -32,14 +31,7 @@ class App {
     }
 
     private initializeRoutes(): void {
-        this.app.get("/health", (_req, res) => res.status(200).send("OK"));
-        this.app.use("/parse", parseRoute);
-        this.app.use("/send", sendRoute);
-        this.app.post("/mock", express.raw({ type: "*/*" }), (req, res) => {
-            console.log("Payload binaire reçu:", req.body);
-            res.setHeader("Content-Type", "application/x-protobuf");
-            res.send(req.body);
-        });
+        this.app.use('/api', routes);
     }
 }
 
