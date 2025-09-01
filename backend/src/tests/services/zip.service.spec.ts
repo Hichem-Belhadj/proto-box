@@ -1,13 +1,15 @@
 import AdmZip from "adm-zip";
 import path from "path";
-import os from "os";
 import {promises as fs} from "fs";
 import {ZipService} from "../../services/zip.service";
+import tmp from "tmp";
 
 async function writeTempZip(zip: AdmZip): Promise<string> {
-    const file = path.join(os.tmpdir(), `test-${Date.now()}-${Math.random()}.zip`);
-    await fs.writeFile(file, zip.toBuffer());
-    return file;
+    const tmpFile = tmp.fileSync({ postfix: ".zip" });
+    const filePath = tmpFile.name;
+    await fs.writeFile(filePath, zip.toBuffer());
+
+    return filePath;
 }
 
 function makeZip(entries: Array<{ name: string; data?: Buffer | string }>): AdmZip {
