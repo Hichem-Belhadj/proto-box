@@ -1,0 +1,5 @@
+<router-outlet/>
+<input type="file" (change)="onFileSelected($event)"/>
+@if (descriptor) {
+  <div>Descriptor reçu (taille: {{ descriptor.byteLength }} bytes)</div>
+}
