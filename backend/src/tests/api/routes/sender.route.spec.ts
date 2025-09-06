@@ -67,7 +67,10 @@ describe("POST /send", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({error: "Missing url query param"});
+        expect(res.body).toEqual({
+            "code": "SEND_INVALID_URL",
+            "message": "Missing url query param"
+        });
     });
 
     it("should return 400 when payload is missing", async () => {
@@ -81,7 +84,10 @@ describe("POST /send", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({error: "Missing protobuf payload"});
+        expect(res.body).toEqual({
+            "code": "SEND_INVALID_PAYLOAD",
+            "message": "Missing protobuf payload"
+        });
     });
 
     it("should return 400 when payload is not a Buffer", async () => {
@@ -98,7 +104,10 @@ describe("POST /send", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({error: "Missing protobuf payload"});
+        expect(res.body).toEqual({
+            "code": "SEND_INVALID_PAYLOAD",
+            "message": "Missing protobuf payload"
+        });
     });
 
     it("should proxy binary payload and return octet-stream with upstream status", async () => {
@@ -151,6 +160,9 @@ describe("POST /send", () => {
 
         // THEN
         expect(res.status).toBe(500);
-        expect(res.body).toEqual({error: "upstream unavailable"});
+        expect(res.body).toEqual({
+            "code": "SEND_PROXY_ERROR",
+            "message": "upstream unavailable"
+        });
     });
 });

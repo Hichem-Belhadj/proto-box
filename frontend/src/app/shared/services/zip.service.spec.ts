@@ -11,7 +11,7 @@ describe('ZipService', () => {
 
   beforeEach(() => MockBuilder(ZipService)
     .provide(provideHttpClient())
-    .provide(provideHttpClientTesting()) );
+    .provide(provideHttpClientTesting()));
 
   beforeEach(() => {
     service = ngMocks.findInstance(ZipService);
