@@ -9,7 +9,7 @@ import {ZipService} from "../../../services/zip.service";
 import {ProtocService} from "../../../services/protoc.service";
 import AdmZip from "adm-zip";
 import {container} from "../../../config/container";
-import { zipOnlyMiddleware } from "../../../api/middleware/uploadZip";
+import {zipOnlyMiddleware} from "../../../api/middleware/uploadZip";
 
 jest.mock("../../../api/middleware/uploadZip", () => ({
     zipOnlyMiddleware: jest.fn(),
@@ -36,8 +36,8 @@ describe("POST /parse", () => {
     let zipServiceMock: Partial<ZipService>;
 
     beforeEach(() => {
-        protocServiceMock = { buildDescriptor: jest.fn() };
-        zipServiceMock = { extractSafely: jest.fn() };
+        protocServiceMock = {buildDescriptor: jest.fn()};
+        zipServiceMock = {extractSafely: jest.fn()};
 
         container.rebindSync<ProtocService>("ProtocService").toConstantValue(protocServiceMock as ProtocService);
         container.rebindSync<ZipService>("ZipService").toConstantValue(zipServiceMock as ZipService);
@@ -61,7 +61,10 @@ describe("POST /parse", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "Invalid mime type" });
+        expect(res.body).toEqual({
+            "code": "INVALID_ZIP_FILE",
+            "message": "Invalid mime type"
+        });
     });
 
     it("should return 400 when no file is received", async () => {
@@ -74,7 +77,10 @@ describe("POST /parse", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "No file received" });
+        expect(res.body).toEqual({
+            "code": "EMPTY_ZIP_FILE",
+            "message": "No file received"
+        });
     });
 
     it("should process zip, return octet-stream and X-Proto-Files on success", async () => {
@@ -132,7 +138,7 @@ describe("POST /parse", () => {
         const tmpUpload = path.join(os.tmpdir(), `up-${Date.now()}.zip`);
 
         (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
-            req.file = { originalname: "protos.zip", size: 123, path: tmpUpload };
+            req.file = {originalname: "protos.zip", size: 123, path: tmpUpload};
             next();
         });
 
@@ -146,7 +152,10 @@ describe("POST /parse", () => {
 
         // THEN
         expect(res.status).toBe(400);
-        expect(res.body).toEqual({ error: "bad zip" });
+        expect(res.body).toEqual({
+            "code": "INVALID_ZIP_FILE",
+            "message": "bad zip"
+        });
 
         expect(protocServiceMock.buildDescriptor).not.toHaveBeenCalled();
         expect(unlinkSpy).toHaveBeenCalledWith(path.resolve(tmpUpload));
@@ -157,7 +166,7 @@ describe("POST /parse", () => {
         const tmpUpload = path.join(os.tmpdir(), `up-${Date.now()}.zip`);
 
         (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
-            req.file = { originalname: "protos.zip", size: 123, path: tmpUpload };
+            req.file = {originalname: "protos.zip", size: 123, path: tmpUpload};
             next();
         });
 

@@ -6,6 +6,7 @@ import {promises as fs} from "fs";
 import { Request, Response } from 'express';
 import path from "path";
 import os from "os";
+import {ErrorModel} from "../../models/error";
 
 interface UploadRequest extends Request {
     fileValidationError?: string;
@@ -23,12 +24,18 @@ export class ParserController {
     parseProto = async (req: UploadRequest, res: Response) => {
         if (req.fileValidationError) {
             Logger.warn(`Upload rejected: ${ req.fileValidationError }`);
-            return res.status(400).json({ error: req.fileValidationError });
+            return res.status(400).json({
+                code: "INVALID_ZIP_FILE",
+                message: req.fileValidationError
+            } as ErrorModel);
         }
 
         if (!req.file) {
             Logger.warn("Upload rejected: no file received");
-            return res.status(400).json({ error: "No file received" });
+            return res.status(400).json({
+                code: "EMPTY_ZIP_FILE",
+                message: "No file received"
+            } as ErrorModel);
         }
 
         try {
@@ -51,7 +58,10 @@ export class ParserController {
         } catch (e: unknown) {
             const errMessage =  (e as Error).message ?? "Invalid ZIP";
             Logger.error(`ZIP extraction error: ${errMessage}`);
-            return res.status(400).json({ error: errMessage });
+            return res.status(400).json({
+                code: "INVALID_ZIP_FILE",
+                message: errMessage
+            } as ErrorModel);
         } finally {
             if (req.file?.path) {
                 await this.safeDelete(req.file.path);

@@ -3,6 +3,7 @@ import os from "os";
 import {randomUUID} from "crypto";
 import {NextFunction, Request, Response} from "express";
 import Logger from "../../utils/errors/logger";
+import {ErrorModel} from "../../models/error";
 
 function isZip(file: Express.Multer.File): boolean {
     const mt = (file.mimetype || "").toLowerCase();
@@ -34,13 +35,19 @@ export const zipOnlyMiddleware = (req: Request, res: Response, next: NextFunctio
         if (err) {
             const status = isMulterError(err) ? 400 : 500;
             Logger.error(`ZIP extraction error: ${getMessage(err)}`);
-            res.status(status).json({ error: getMessage(err) });
+            res.status(status).json({
+                code: "INVALID_ZIP_FILE",
+                message: getMessage(err)
+            } as ErrorModel);
             return;
         }
 
         if (!req.file) {
             Logger.error(`ZIP extraction error: "No file uploaded"`);
-            res.status(400).json({ error: "No file uploaded" });
+            res.status(400).json({
+                code: "EMPTY_ZIP_FILE",
+                message: "No file uploaded"
+            } as ErrorModel);
             return;
         }
 
