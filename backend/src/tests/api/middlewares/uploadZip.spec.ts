@@ -4,12 +4,12 @@ import path from "path";
 import os from "os";
 import { promises as fs } from "fs";
 
-import { uploadZip } from "../../../api/middleware/uploadZip";
+import { zipOnlyMiddleware } from "../../../api/middleware/uploadZip";
 
 const buildApp = () => {
     const app = express();
     app.post("/mw", (req, res) => {
-        uploadZip(req as any, res as any, (err: any) => {
+        zipOnlyMiddleware(req as any, res as any, (err: any) => {
             if (err) {
                 return res.status(400).json({ code: err.code, message: err.message });
             }
@@ -67,7 +67,7 @@ describe("uploadZip middleware", () => {
         await fs.unlink(res.body.file.path);
     });
 
-    it("should reject a non-zip file with LIMIT_UNEXPECTED_FILE", async () => {
+    it("should reject a non-zip file with 'Only .zip files are allowed'", async () => {
         // GIVEN
         const app = buildApp();
         const buf = Buffer.from("not a zip");
@@ -76,16 +76,13 @@ describe("uploadZip middleware", () => {
         const res = await request(app)
             .post("/mw")
             .attach("file", buf, { filename: "note.txt", contentType: "text/plain" })
-            .expect(400);
+            .expect(500);
 
         // THEN
-        expect(res.body).toEqual({
-            code: "LIMIT_UNEXPECTED_FILE",
-            message: expect.any(String),
-        });
+        expect(res.body).toEqual({ error: "Only .zip files are allowed" });
     });
 
-    it("should reject an oversized zip with LIMIT_FILE_SIZE", async () => {
+    it("should reject an oversized zip with 'File too large'", async () => {
         // GIVEN
         const app = buildApp();
         const big = Buffer.alloc(25 * 1024 * 1024 + 1, 1); // > 25MB
@@ -97,22 +94,34 @@ describe("uploadZip middleware", () => {
             .expect(400);
 
         // THEN
-        expect(res.body).toEqual({
-            code: "LIMIT_FILE_SIZE",
-            message: expect.any(String),
-        });
+        expect(res.body).toEqual({ error: "File too large" });
     });
 
-    it("should pass through with 200 and null file when no file is sent (middleware alone)", async () => {
+    it("should reject an empty file with 'No file uploaded'", async () => {
         // GIVEN
         const app = buildApp();
 
         // WHEN
         const res = await request(app)
             .post("/mw")
+            .expect(400);
+
+        // THEN
+        expect(res.body).toEqual({ error: "No file uploaded" });
+    });
+
+    it("should pass through with 200", async () => {
+        // GIVEN
+        const app = buildApp();
+        const buf = Buffer.from("zip file");
+
+        // WHEN
+        const res = await request(app)
+            .post("/mw")
+            .attach("file", buf, { filename: "huge.zip", contentType: "application/zip" })
             .expect(200);
 
         // THEN
-        expect(res.body.file).toBeNull();
+        expect(res.body.file).toBeTruthy();
     });
 });

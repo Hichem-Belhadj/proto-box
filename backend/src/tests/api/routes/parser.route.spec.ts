@@ -7,12 +7,12 @@ import {promises as fs} from "fs";
 import router from "../../../api/routes/parser.route";
 import {ZipService} from "../../../services/zip.service";
 import {ProtocService} from "../../../services/protoc.service";
-import {uploadZip} from "../../../api/middleware/uploadZip";
 import AdmZip from "adm-zip";
 import {container} from "../../../config/container";
+import { zipOnlyMiddleware } from "../../../api/middleware/uploadZip";
 
 jest.mock("../../../api/middleware/uploadZip", () => ({
-    uploadZip: jest.fn(),
+    zipOnlyMiddleware: jest.fn(),
 }));
 
 jest.mock("../../../utils/errors/logger", () => ({
@@ -50,7 +50,7 @@ describe("POST /parse", () => {
 
     it("should return 400 when upload middleware sets a validation error", async () => {
         // GIVEN
-        (uploadZip as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
+        (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
             req.fileValidationError = "Invalid mime type";
             next();
         });
@@ -66,7 +66,7 @@ describe("POST /parse", () => {
 
     it("should return 400 when no file is received", async () => {
         // GIVEN
-        (uploadZip as jest.Mock).mockImplementation((_req: any, _res: any, next: any) => next());
+        (zipOnlyMiddleware as jest.Mock).mockImplementation((_req: any, _res: any, next: any) => next());
         const app = buildApp();
 
         // WHEN
@@ -84,7 +84,7 @@ describe("POST /parse", () => {
         zip.addFile("root.proto", Buffer.from("syntax = \"proto3\";"));
         zip.writeZip(tmpUpload);
 
-        (uploadZip as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
+        (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
             req.file = {
                 fieldname: "file",
                 originalname: "protos.zip",
@@ -131,7 +131,7 @@ describe("POST /parse", () => {
         // GIVEN
         const tmpUpload = path.join(os.tmpdir(), `up-${Date.now()}.zip`);
 
-        (uploadZip as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
+        (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
             req.file = { originalname: "protos.zip", size: 123, path: tmpUpload };
             next();
         });
@@ -156,7 +156,7 @@ describe("POST /parse", () => {
         // GIVEN
         const tmpUpload = path.join(os.tmpdir(), `up-${Date.now()}.zip`);
 
-        (uploadZip as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
+        (zipOnlyMiddleware as jest.Mock).mockImplementation((req: any, _res: any, next: any) => {
             req.file = { originalname: "protos.zip", size: 123, path: tmpUpload };
             next();
         });
